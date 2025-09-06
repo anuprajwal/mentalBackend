@@ -1,11 +1,15 @@
 from openai import OpenAI
+import json
+import re
 
-client = OpenAI(api_key="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")
+client = OpenAI(
+    api_key="IzaSyCVV53uz1dw12Lky8KEborNe4IYCoS8hH0",
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+)
 
 def get_ai_response(user_query: str) -> str:
-
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gemini-2.5-flash-lite",
         messages=[
             {
                 "role": "system",
@@ -18,12 +22,33 @@ def get_ai_response(user_query: str) -> str:
                     "Avoid being overly formal or robotic—speak naturally, warmly, and kindly, just like a real friend."
                 )
             },
-            {
-                "role": "user",
-                "content": user_query
-            }
+            {"role": "user", "content": user_query}
         ]
     )
-
-    # Extract clean response text
     return response.choices[0].message.content.strip()
+
+def analyze_journal_entry(entry: str, mood: str):
+    prompt = f"""
+    You are an AI wellness companion.
+    Analyze the following journal entry and respond in JSON only with two fields:
+    1. "tags": 3-5 short hashtags that summarize the key emotions or themes.
+    2. "response": a short supportive message (1-2 sentences).
+
+    Journal Entry: "{entry}",
+    mentioned mood: "{mood}"
+    """
+    completion = client.chat.completions.create(
+        model="gemini-2.5-flash-lite",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7
+    )
+    content = completion.choices[0].message.content
+
+
+    cleaned = re.sub(r"^```(?:json)?|```$", "", content.strip(), flags=re.MULTILINE).strip()
+
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        print("⚠️ Could not parse AI response. Raw output:", content)
+        return {"tags": [], "response": content}
