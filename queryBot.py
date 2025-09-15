@@ -1,33 +1,40 @@
-from openai import OpenAI
+import google.generativeai as genai
 import json
 import re
 
-client = OpenAI(
-    api_key="IzaSyCVV53uz1dw12Lky8KEborNe4IYCoS8hH0",
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-)
+# Configure Gemini API key
+# Get your key from https://aistudio.google.com/app/apikey
+genai.configure(api_key="IzaSyC0pfgi2xhfSZ5RpADnPRFCou_6fmwzpY0")
+
+# Create a model instance
+chat_model = genai.GenerativeModel("gemini-1.5-flash")  # or gemini-1.5-pro for better quality
+
 
 def get_ai_response(user_query: str) -> str:
-    response = client.chat.completions.create(
-        model="gemini-2.5-flash-lite",
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are an empathetic and supportive AI friend. "
-                    "Your role is to chat with people who may feel lonely, anxious, or in need of companionship. "
-                    "Always respond like a close, caring friend who listens deeply and replies with warmth, "
-                    "understanding, and genuine emotion. Be comforting, reassuring, and encouraging. "
-                    "Make the user feel that they are not alone and that you are always ready to talk with them. "
-                    "Avoid being overly formal or robotic—speak naturally, warmly, and kindly, just like a real friend."
-                )
-            },
-            {"role": "user", "content": user_query}
-        ]
+    """
+    Empathetic supportive response to a user query.
+    """
+    system_prompt = (
+        "You are an empathetic and supportive AI friend. "
+        "Your role is to chat with people who may feel lonely, anxious, or in need of companionship. "
+        "Always respond like a close, caring friend who listens deeply and replies with warmth, "
+        "understanding, and genuine emotion. Be comforting, reassuring, and encouraging. "
+        "Make the user feel that they are not alone and that you are always ready to talk with them. "
+        "Avoid being overly formal or robotic—speak naturally, warmly, and kindly, just like a real friend."
     )
-    return response.choices[0].message.content.strip()
+
+    response = chat_model.generate_content(
+        [system_prompt, user_query],
+        generation_config={"temperature": 0.7}
+    )
+
+    return response.text.strip()
+
 
 def analyze_journal_entry(entry: str, mood: str):
+    """
+    Analyze the journal entry → return JSON with hashtags + supportive response.
+    """
     prompt = f"""
     You are an AI wellness companion.
     Analyze the following journal entry and respond in JSON only with two fields:
@@ -37,15 +44,16 @@ def analyze_journal_entry(entry: str, mood: str):
     Journal Entry: "{entry}",
     mentioned mood: "{mood}"
     """
-    completion = client.chat.completions.create(
-        model="gemini-2.5-flash-lite",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7
+
+    completion = chat_model.generate_content(
+        prompt,
+        generation_config={"temperature": 0.7}
     )
-    content = completion.choices[0].message.content
 
+    content = completion.text.strip()
 
-    cleaned = re.sub(r"^```(?:json)?|```$", "", content.strip(), flags=re.MULTILINE).strip()
+    # Clean out ```json ... ``` if the model adds it
+    cleaned = re.sub(r"^```(?:json)?|```$", "", content, flags=re.MULTILINE).strip()
 
     try:
         return json.loads(cleaned)
